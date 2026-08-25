@@ -14,12 +14,14 @@ BarWidget {
   readonly property string homeDir: Quickshell.env("HOME")
   readonly property string stateDir: homeDir + "/.local/state/omarchy/local.authenticator"
   readonly property string accountsPath: stateDir + "/accounts.json"
+  readonly property string pluginDir: homeDir + "/.config/omarchy/plugins/local.authenticator"
 
   property var accounts: []
   property string searchQuery: ""
   property bool popupOpen: false
   property bool showAddView: false
   property string copiedAccountId: ""
+  property string statusMessage: ""
   property int selectedIndex: -1
   property int nowSeconds: Math.floor(Date.now() / 1000)
 
@@ -42,6 +44,13 @@ BarWidget {
     id: resetCopiedTimer
     interval: 2000
     onTriggered: root.copiedAccountId = ""
+  }
+
+  // Auto-reset status message
+  Timer {
+    id: resetStatusTimer
+    interval: 3500
+    onTriggered: root.statusMessage = ""
   }
 
   readonly property string tooltipText: {
@@ -109,24 +118,31 @@ BarWidget {
     root.accounts = list
     persistAccounts()
     showAddView = false
+    statusMessage = "Added " + item.issuer + "! ✓"
+    resetStatusTimer.restart()
   }
 
   function importUriOrData(inputStr) {
     var imported = Model.parseImportInput(inputStr)
     if (imported && imported.length > 0) {
       var list = root.accounts.slice()
+      var addedCount = 0
       for (var i = 0; i < imported.length; i++) {
-        // Prevent duplicate secrets
         var exists = list.some(function(a) { return a.secret === imported[i].secret })
         if (!exists) {
           list.push(imported[i])
+          addedCount++
         }
       }
       root.accounts = list
       persistAccounts()
       showAddView = false
-      return imported.length
+      statusMessage = "Imported " + addedCount + (addedCount === 1 ? " account" : " accounts") + "! 🎉"
+      resetStatusTimer.restart()
+      return addedCount
     }
+    statusMessage = "Could not parse QR code or link"
+    resetStatusTimer.restart()
     return 0
   }
 
@@ -136,8 +152,13 @@ BarWidget {
     persistAccounts()
   }
 
-  function scanQrFromScreen() {
-    qrScanProc.running = true
+  function startScan(mode) {
+    statusMessage = mode === "camera" ? "Scanning webcam… Hold phone up" : (mode === "screen" ? "Select area on screen…" : "Opening file picker…")
+    if (mode === "screen") {
+      root.close()
+    }
+    scannerProc.command = [root.pluginDir + "/scanner.sh", mode]
+    scannerProc.running = true
   }
 
   Process {
@@ -152,16 +173,18 @@ BarWidget {
   }
 
   Process {
-    id: qrScanProc
-    // Grab interactive area selection with grim/slurp or prompt, then zbarimg
-    command: ["bash", "-c", "grim -g \"$(slurp)\" /tmp/omarchy_2fa_qr.png && zbarimg --raw /tmp/omarchy_2fa_qr.png 2>/dev/null"]
+    id: scannerProc
     stdout: StdioCollector {
       onDataChanged: {
-        var raw = value.trim()
+        var raw = String(value || "").trim()
         if (raw) {
+          root.open()
           root.importUriOrData(raw)
         }
       }
+    }
+    onExited: function(code) {
+      if (!root.popupOpen) root.open()
     }
   }
 
@@ -359,6 +382,24 @@ BarWidget {
             }
           }
 
+          // ---- Status Toast Message -------------------------------------------
+          Rectangle {
+            visible: root.statusMessage !== ""
+            width: parent.width
+            height: Style.space(24)
+            radius: Style.cornerRadius
+            color: Style.selectedFillFor(Color.foreground, Color.accent)
+
+            Text {
+              anchors.centerIn: parent
+              text: root.statusMessage
+              color: Color.accent
+              font.family: Style.font.family
+              font.pixelSize: Style.font.caption
+              font.bold: true
+            }
+          }
+
           // ---- Search / Filter Bar (when not in Add mode) ---------------------
           Item {
             visible: !root.showAddView && root.accounts.length > 3
@@ -402,40 +443,54 @@ BarWidget {
 
             Text {
               width: parent.width
-              text: "Export accounts in Google Authenticator on your phone, then paste the migration link or scan the QR code:"
+              text: "Export accounts in Google Authenticator on your phone, then scan or paste the export link:"
               color: Qt.darker(Color.foreground, 1.6)
               font.family: Style.font.family
               font.pixelSize: Style.font.caption
               wrapMode: Text.WordWrap
             }
 
+            Row {
+              width: parent.width
+              spacing: Style.space(4)
+
+              Button {
+                text: "📷 Webcam Scan"
+                tooltipText: "Scan phone screen with laptop webcam"
+                fontSize: Style.font.caption
+                onClicked: root.startScan("camera")
+              }
+
+              Button {
+                text: "🖼️ Select Image"
+                tooltipText: "Select a photo/screenshot of the QR code"
+                fontSize: Style.font.caption
+                onClicked: root.startScan("file")
+              }
+
+              Button {
+                text: "🖥️ Screen Area"
+                tooltipText: "Select QR code on screen"
+                fontSize: Style.font.caption
+                onClicked: root.startScan("screen")
+              }
+            }
+
             TextField {
               id: importField
               width: parent.width
-              placeholderText: "Paste otpauth-migration:// or otpauth:// URI"
+              placeholderText: "Or paste otpauth-migration:// or otpauth:// URI"
               foreground: Color.foreground
               font.family: Style.font.family
             }
 
-            Row {
-              spacing: Style.space(6)
-
-              Button {
-                text: "Import Link"
-                iconText: "󰄬"
-                fontSize: Style.font.caption
-                onClicked: {
-                  var count = root.importUriOrData(importField.text)
-                  if (count > 0) importField.text = ""
-                }
-              }
-
-              Button {
-                text: "Scan QR from Screen"
-                iconText: "󰄀"
-                tooltipText: "Select QR code on screen to import"
-                fontSize: Style.font.caption
-                onClicked: root.scanQrFromScreen()
+            Button {
+              text: "Import Link"
+              iconText: "󰄬"
+              fontSize: Style.font.caption
+              onClicked: {
+                var count = root.importUriOrData(importField.text)
+                if (count > 0) importField.text = ""
               }
             }
 
