@@ -1,0 +1,11 @@
+{
+  "id": "local.authenticator",
+  "name": "Authenticator",
+  "description": "Two-factor authentication (2FA / TOTP) with live countdown and Google Authenticator export clone",
+  "version": "1.0.0",
+  "author": "ademahmudf",
+  "category": "Productivity",
+  "entrypoints": {
+    "bar-widget": "BarWidget.qml"
+  }
+}
