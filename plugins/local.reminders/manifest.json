@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "local.reminders",
+  "name": "Reminders",
+  "version": "1.0.0",
+  "author": "admhmdf",
+  "license": "MIT",
+  "description": "Apple Reminders-style local task manager in the status bar with simple add, check, edit, and delete.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Reminders",
+    "description": "Quick reminder counter and popup task list",
+    "category": "Productivity",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}

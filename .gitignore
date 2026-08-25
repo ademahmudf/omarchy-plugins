@@ -1,0 +1,7 @@
+# State & OS files
+.DS_Store
+*.swp
+*~
+*.bak
+.local/
+*.json.bak
