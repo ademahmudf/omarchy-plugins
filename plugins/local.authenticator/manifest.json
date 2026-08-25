@@ -1,11 +1,22 @@
 {
+  "schemaVersion": 1,
   "id": "local.authenticator",
   "name": "Authenticator",
-  "description": "Two-factor authentication (2FA / TOTP) with live countdown and Google Authenticator export clone",
   "version": "1.0.0",
-  "author": "ademahmudf",
-  "category": "Productivity",
-  "entrypoints": {
-    "bar-widget": "BarWidget.qml"
+  "author": "admhmdf",
+  "license": "MIT",
+  "description": "Two-factor authentication (2FA / TOTP) with live countdown and Google Authenticator export clone.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Authenticator",
+    "description": "2FA TOTP codes with live 30s timer and 1-click clipboard copy",
+    "category": "Productivity",
+    "allowMultiple": false,
+    "defaultSection": "right"
   }
 }
