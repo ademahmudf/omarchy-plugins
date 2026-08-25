@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "local.proofread",
+  "name": "AI Proofreader",
+  "version": "1.0.0",
+  "author": "admhmdf",
+  "license": "MIT",
+  "description": "Instant AI grammar fix, sentence polisher, and tone rewriter powered by Gemini, OpenAI, Groq, or local Ollama.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "AI Proofreader",
+    "description": "Instant AI sentence polisher and tone rewriter",
+    "category": "Productivity",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}
