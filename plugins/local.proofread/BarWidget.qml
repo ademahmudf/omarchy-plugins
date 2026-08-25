@@ -25,7 +25,8 @@ BarWidget {
   property string errorMessage: ""
 
   readonly property string activeModelName: {
-    if (settings.provider === "gemini") return settings.geminiModel || "gemini-1.5-flash"
+    if (settings.provider === "lmstudio") return "Gemma (LM Studio)"
+    if (settings.provider === "gemini") return settings.geminiModel || "gemini-2.5-flash"
     if (settings.provider === "groq") return settings.groqModel || "llama-3.3-70b"
     if (settings.provider === "openai") return settings.openaiModel || "gpt-4o-mini"
     return settings.ollamaModel || "ollama"
@@ -81,7 +82,15 @@ BarWidget {
     var systemPrompt = Model.getSystemPrompt(root.activeMode)
     var req = null
 
-    if (settings.provider === "gemini") {
+    if (settings.provider === "lmstudio") {
+      req = Model.buildOpenAiCompatibleRequest(
+        settings.lmstudioEndpoint || "http://127.0.0.1:1234/v1",
+        "",
+        settings.lmstudioModel || "google/gemma-4-e4b",
+        systemPrompt,
+        text
+      )
+    } else if (settings.provider === "gemini") {
       if (!settings.apiKey) {
         isLoading = false
         showSettings = true
@@ -113,7 +122,11 @@ BarWidget {
     sendHttpRequest(req.url, req.headers, req.body, function(success, responseText) {
       root.isLoading = false
       if (!success) {
-        root.errorMessage = "Connection error: " + responseText
+        if (root.settings.provider === "lmstudio") {
+          root.errorMessage = "Could not connect to LM Studio on port 1234. Make sure 'lms server start' is running."
+        } else {
+          root.errorMessage = "Connection error: " + responseText
+        }
         return
       }
       if (root.settings.provider === "gemini") {
@@ -206,7 +219,7 @@ BarWidget {
     id: button
     anchors.fill: parent
     bar: root.bar
-    tooltipText: "AI Proofreader"
+    tooltipText: "AI Proofreader (" + root.activeModelName + ")"
     labelVisible: false
     hasVisualContent: true
     fixedWidth: root.vertical ? -1 : Math.ceil(iconItem.implicitWidth + Style.spaceReal(horizontalMargin) * 2)
@@ -301,7 +314,7 @@ BarWidget {
 
             Button {
               iconText: root.showSettings ? "󰅖" : "󰒓"
-              tooltipText: root.showSettings ? "Back to Proofreader" : "Settings (API Key / Model)"
+              tooltipText: root.showSettings ? "Back to Proofreader" : "Settings (Provider / Model)"
               fontSize: Style.font.bodySmall
               horizontalPadding: Style.space(5)
               verticalPadding: Style.space(2)
@@ -350,10 +363,21 @@ BarWidget {
           // Provider selector
           Row {
             width: parent.width
-            spacing: Style.space(4)
+            spacing: Style.space(3)
 
             ProviderTab {
-              label: "Gemini (Free)"
+              label: "LM Studio"
+              providerKey: "lmstudio"
+              activeProvider: root.settings.provider
+              onClicked: {
+                var s = Object.assign({}, root.settings, { provider: "lmstudio" })
+                root.settings = s
+                root.persistSettings()
+              }
+            }
+
+            ProviderTab {
+              label: "Gemini"
               providerKey: "gemini"
               activeProvider: root.settings.provider
               onClicked: {
@@ -364,7 +388,7 @@ BarWidget {
             }
 
             ProviderTab {
-              label: "Groq (Fast)"
+              label: "Groq"
               providerKey: "groq"
               activeProvider: root.settings.provider
               onClicked: {
@@ -386,7 +410,7 @@ BarWidget {
             }
 
             ProviderTab {
-              label: "Ollama (Local)"
+              label: "Ollama"
               providerKey: "ollama"
               activeProvider: root.settings.provider
               onClicked: {
@@ -397,63 +421,101 @@ BarWidget {
             }
           }
 
-          Text {
-            visible: root.settings.provider !== "ollama"
-            text: "API Key:"
-            color: Qt.darker(Color.foreground, 1.4)
-            font.family: Style.font.family
-            font.pixelSize: Style.font.caption
-          }
-
-          TextField {
-            id: apiKeyField
-            visible: root.settings.provider !== "ollama"
+          // API Key (for cloud providers)
+          Column {
+            visible: root.settings.provider !== "lmstudio" && root.settings.provider !== "ollama"
             width: parent.width
-            text: root.settings.apiKey || ""
-            placeholderText: root.settings.provider === "gemini" ? "Paste Gemini API Key (from AI Studio)" : "Paste API Key"
-            echoMode: TextInput.Password
-            foreground: Color.foreground
-            font.family: Style.font.family
-            onTextChanged: {
-              var s = Object.assign({}, root.settings, { apiKey: text })
-              root.settings = s
+            spacing: 2
+
+            Text {
+              text: "API Key:"
+              color: Qt.darker(Color.foreground, 1.4)
+              font.family: Style.font.family
+              font.pixelSize: Style.font.caption
+            }
+
+            TextField {
+              id: apiKeyField
+              width: parent.width
+              text: root.settings.apiKey || ""
+              placeholderText: root.settings.provider === "gemini" ? "Paste Gemini API Key (from AI Studio)" : "Paste API Key"
+              echoMode: TextInput.Password
+              foreground: Color.foreground
+              font.family: Style.font.family
+              onTextChanged: {
+                var s = Object.assign({}, root.settings, { apiKey: text })
+                root.settings = s
+              }
             }
           }
 
-          Text {
-            text: "Model Name:"
-            color: Qt.darker(Color.foreground, 1.4)
-            font.family: Style.font.family
-            font.pixelSize: Style.font.caption
-          }
-
-          TextField {
-            id: modelNameField
+          // Model / Endpoint for LM Studio
+          Column {
+            visible: root.settings.provider === "lmstudio"
             width: parent.width
-            text: {
-              if (root.settings.provider === "gemini") return root.settings.geminiModel || "gemini-2.5-flash"
-              if (root.settings.provider === "groq") return root.settings.groqModel || "llama-3.3-70b-versatile"
-              if (root.settings.provider === "openai") return root.settings.openaiModel || "gpt-4o-mini"
-              return root.settings.ollamaModel || "llama3"
+            spacing: 2
+
+            Text {
+              text: "LM Studio Server URL:"
+              color: Qt.darker(Color.foreground, 1.4)
+              font.family: Style.font.family
+              font.pixelSize: Style.font.caption
             }
-            placeholderText: "Model (e.g. gemini-2.5-flash)"
-            foreground: Color.foreground
-            font.family: Style.font.family
-            onTextChanged: {
-              var p = root.settings.provider
-              var s = Object.assign({}, root.settings)
-              if (p === "gemini") s.geminiModel = text
-              else if (p === "groq") s.groqModel = text
-              else if (p === "openai") s.openaiModel = text
-              else if (p === "ollama") s.ollamaModel = text
-              root.settings = s
+
+            TextField {
+              width: parent.width
+              text: root.settings.lmstudioEndpoint || "http://127.0.0.1:1234/v1"
+              foreground: Color.foreground
+              font.family: Style.font.family
+              onTextChanged: {
+                var s = Object.assign({}, root.settings, { lmstudioEndpoint: text })
+                root.settings = s
+              }
+            }
+          }
+
+          // Model Name
+          Column {
+            width: parent.width
+            spacing: 2
+
+            Text {
+              text: "Model Identifier:"
+              color: Qt.darker(Color.foreground, 1.4)
+              font.family: Style.font.family
+              font.pixelSize: Style.font.caption
+            }
+
+            TextField {
+              id: modelNameField
+              width: parent.width
+              text: {
+                if (root.settings.provider === "lmstudio") return root.settings.lmstudioModel || "google/gemma-4-e4b"
+                if (root.settings.provider === "gemini") return root.settings.geminiModel || "gemini-2.5-flash"
+                if (root.settings.provider === "groq") return root.settings.groqModel || "llama-3.3-70b-versatile"
+                if (root.settings.provider === "openai") return root.settings.openaiModel || "gpt-4o-mini"
+                return root.settings.ollamaModel || "llama3"
+              }
+              placeholderText: "Model (e.g. google/gemma-4-e4b)"
+              foreground: Color.foreground
+              font.family: Style.font.family
+              onTextChanged: {
+                var p = root.settings.provider
+                var s = Object.assign({}, root.settings)
+                if (p === "lmstudio") s.lmstudioModel = text
+                else if (p === "gemini") s.geminiModel = text
+                else if (p === "groq") s.groqModel = text
+                else if (p === "openai") s.openaiModel = text
+                else if (p === "ollama") s.ollamaModel = text
+                root.settings = s
+              }
             }
           }
 
           Text {
-            visible: root.settings.provider === "gemini"
-            text: "💡 Tip: Free models include gemini-2.5-flash and gemini-flash-latest"
-            color: Qt.darker(Color.foreground, 2.0)
+            visible: root.settings.provider === "lmstudio"
+            text: "⚡ Running locally with LM Studio and Google Gemma on your device"
+            color: Color.accent
             font.family: Style.font.family
             font.pixelSize: Style.font.caption
           }
@@ -712,7 +774,7 @@ BarWidget {
     signal clicked()
 
     readonly property bool active: providerKey === activeProvider
-    width: Math.max(pTabText.implicitWidth + Style.space(10), (parent.width - Style.space(12)) / 4)
+    width: Math.max(pTabText.implicitWidth + Style.space(8), (parent.width - Style.space(16)) / 5)
     height: Style.space(22)
     radius: Style.cornerRadius
     color: active ? Style.selectedFillFor(Color.foreground, Color.accent) : (pTabHover.hovered ? Style.hoverFillFor(Color.foreground, Color.accent) : "transparent")

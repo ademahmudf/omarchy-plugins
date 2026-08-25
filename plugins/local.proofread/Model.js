@@ -9,8 +9,10 @@ var PROMPTS = {
 };
 
 var DEFAULT_SETTINGS = {
-  provider: "gemini", // "gemini" | "groq" | "openai" | "ollama"
+  provider: "lmstudio", // "lmstudio" | "gemini" | "groq" | "openai" | "ollama"
   apiKey: "",
+  lmstudioEndpoint: "http://127.0.0.1:1234/v1",
+  lmstudioModel: "google/gemma-4-e4b",
   geminiModel: "gemini-2.5-flash",
   openaiModel: "gpt-4o-mini",
   groqModel: "llama-3.3-70b-versatile",
@@ -44,10 +46,11 @@ function parseSettingsJson(jsonText) {
   try {
     var data = JSON.parse(jsonText);
     var res = Object.assign({}, DEFAULT_SETTINGS, data);
-    // Upgrade outdated model names
     if (res.geminiModel === "gemini-1.5-flash" || !res.geminiModel) {
       res.geminiModel = "gemini-2.5-flash";
     }
+    if (!res.lmstudioEndpoint) res.lmstudioEndpoint = "http://127.0.0.1:1234/v1";
+    if (!res.lmstudioModel) res.lmstudioModel = "google/gemma-4-e4b";
     return res;
   } catch (e) {
     return Object.assign({}, DEFAULT_SETTINGS);
