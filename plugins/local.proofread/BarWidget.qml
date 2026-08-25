@@ -421,8 +421,38 @@ BarWidget {
           }
 
           Text {
+            text: "Model Name:"
+            color: Qt.darker(Color.foreground, 1.4)
+            font.family: Style.font.family
+            font.pixelSize: Style.font.caption
+          }
+
+          TextField {
+            id: modelNameField
+            width: parent.width
+            text: {
+              if (root.settings.provider === "gemini") return root.settings.geminiModel || "gemini-2.5-flash"
+              if (root.settings.provider === "groq") return root.settings.groqModel || "llama-3.3-70b-versatile"
+              if (root.settings.provider === "openai") return root.settings.openaiModel || "gpt-4o-mini"
+              return root.settings.ollamaModel || "llama3"
+            }
+            placeholderText: "Model (e.g. gemini-2.5-flash)"
+            foreground: Color.foreground
+            font.family: Style.font.family
+            onTextChanged: {
+              var p = root.settings.provider
+              var s = Object.assign({}, root.settings)
+              if (p === "gemini") s.geminiModel = text
+              else if (p === "groq") s.groqModel = text
+              else if (p === "openai") s.openaiModel = text
+              else if (p === "ollama") s.ollamaModel = text
+              root.settings = s
+            }
+          }
+
+          Text {
             visible: root.settings.provider === "gemini"
-            text: "💡 Tip: You can get a 100% free Gemini API key at aistudio.google.com"
+            text: "💡 Tip: Free models include gemini-2.5-flash and gemini-flash-latest"
             color: Qt.darker(Color.foreground, 2.0)
             font.family: Style.font.family
             font.pixelSize: Style.font.caption

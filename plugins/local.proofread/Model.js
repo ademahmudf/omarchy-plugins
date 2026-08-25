@@ -11,7 +11,7 @@ var PROMPTS = {
 var DEFAULT_SETTINGS = {
   provider: "gemini", // "gemini" | "groq" | "openai" | "ollama"
   apiKey: "",
-  geminiModel: "gemini-1.5-flash",
+  geminiModel: "gemini-2.5-flash",
   openaiModel: "gpt-4o-mini",
   groqModel: "llama-3.3-70b-versatile",
   ollamaEndpoint: "http://localhost:11434/v1",
@@ -43,14 +43,20 @@ function parseSettingsJson(jsonText) {
   if (!jsonText || String(jsonText).trim() === "") return Object.assign({}, DEFAULT_SETTINGS);
   try {
     var data = JSON.parse(jsonText);
-    return Object.assign({}, DEFAULT_SETTINGS, data);
+    var res = Object.assign({}, DEFAULT_SETTINGS, data);
+    // Upgrade outdated model names
+    if (res.geminiModel === "gemini-1.5-flash" || !res.geminiModel) {
+      res.geminiModel = "gemini-2.5-flash";
+    }
+    return res;
   } catch (e) {
     return Object.assign({}, DEFAULT_SETTINGS);
   }
 }
 
 function buildGeminiRequest(apiKey, model, systemPrompt, userText) {
-  var url = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model || "gemini-1.5-flash") + ":generateContent?key=" + encodeURIComponent(apiKey || "");
+  var activeModel = model || "gemini-2.5-flash";
+  var url = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(activeModel) + ":generateContent?key=" + encodeURIComponent(apiKey || "");
   var payload = {
     contents: [
       {
