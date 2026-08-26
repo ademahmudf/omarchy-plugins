@@ -13,6 +13,7 @@ BarWidget {
   readonly property string homeDir: Quickshell.env("HOME")
   readonly property string stateDir: homeDir + "/.local/state/omarchy/local.proofread"
   readonly property string settingsPath: stateDir + "/settings.json"
+  readonly property string getSelectionScript: homeDir + "/.config/omarchy/plugins/local.proofread/get-selection.sh"
 
   property var settings: Model.DEFAULT_SETTINGS
   property string activeMode: "fix" // "fix" | "professional" | "concise" | "casual" | "translate"
@@ -32,12 +33,31 @@ BarWidget {
     return settings.ollamaModel || "ollama"
   }
 
+  property bool syncingInputText: false
+
+  function syncInputText(val) {
+    root.inputText = val
+    if (inputArea && inputArea.text !== val) {
+      syncingInputText = true
+      inputArea.text = val
+      syncingInputText = false
+    }
+  }
+
+  onInputTextChanged: {
+    if (!syncingInputText && inputArea && inputArea.text !== root.inputText) {
+      syncingInputText = true
+      inputArea.text = root.inputText
+      syncingInputText = false
+    }
+  }
+
   function open() {
     popupOpen = true
     showSettings = false
     copied = false
     errorMessage = ""
-    readClipboardProc.running = true
+    fetchSelection()
     Qt.callLater(function() {
       if (inputArea) inputArea.forceActiveFocus()
     })
@@ -53,6 +73,13 @@ BarWidget {
     else open()
   }
 
+  function fetchSelection() {
+    if (readSelectionProc.running) {
+      readSelectionProc.running = false
+    }
+    readSelectionProc.running = true
+  }
+
   function loadSettingsFromText(text) {
     root.settings = Model.parseSettingsJson(text)
   }
@@ -63,10 +90,14 @@ BarWidget {
 
   function copyResultAndClose(autoClose) {
     if (!outputText) return
-    copyProc.command = ["wl-copy", outputText]
+    var textToCopy = outputText
+    copyProc.command = ["sh", "-c", "printf '%s' " + JSON.stringify(textToCopy) + " | wl-copy && wl-copy -p -c 2>/dev/null || true"]
     copyProc.running = true
     root.copied = true
     if (autoClose) {
+      root.syncInputText("")
+      root.outputText = ""
+      root.errorMessage = ""
       Qt.callLater(function() { root.close() })
     }
   }
@@ -179,13 +210,32 @@ BarWidget {
   }
 
   Process {
-    id: readClipboardProc
-    command: ["wl-paste", "--no-newline"]
+    id: readSelectionProc
+    command: [root.getSelectionScript]
     stdout: StdioCollector {
-      onDataChanged: {
-        var raw = String(value || "").trim()
-        if (raw && !root.inputText) {
-          root.inputText = raw
+      waitForEnd: true
+      onStreamFinished: {
+        var raw = String(text || "").trim()
+        if (raw) {
+          root.syncInputText(raw)
+          root.outputText = ""
+          root.errorMessage = ""
+        }
+      }
+    }
+  }
+
+  Process {
+    id: readClipboardProc
+    command: [root.getSelectionScript, "--all"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: {
+        var raw = String(text || "").trim()
+        if (raw) {
+          root.syncInputText(raw)
+          root.outputText = ""
+          root.errorMessage = ""
         }
       }
     }
@@ -246,6 +296,13 @@ BarWidget {
     open: root.popupOpen
     contentWidth: popup.fittedContentWidth(Style.space(380))
     contentHeight: popup.fittedContentHeight(Style.space(520))
+
+    Keys.onPressed: function(event) {
+      if (event.key === Qt.Key_Escape) {
+        root.close()
+        event.accepted = true
+      }
+    }
 
     Flickable {
       id: scroll
@@ -442,6 +499,12 @@ BarWidget {
               echoMode: TextInput.Password
               foreground: Color.foreground
               font.family: Style.font.family
+              Keys.onPressed: function(event) {
+                if (event.key === Qt.Key_Escape) {
+                  root.close()
+                  event.accepted = true
+                }
+              }
               onTextChanged: {
                 var s = Object.assign({}, root.settings, { apiKey: text })
                 root.settings = s
@@ -467,6 +530,12 @@ BarWidget {
               text: root.settings.lmstudioEndpoint || "http://127.0.0.1:1234/v1"
               foreground: Color.foreground
               font.family: Style.font.family
+              Keys.onPressed: function(event) {
+                if (event.key === Qt.Key_Escape) {
+                  root.close()
+                  event.accepted = true
+                }
+              }
               onTextChanged: {
                 var s = Object.assign({}, root.settings, { lmstudioEndpoint: text })
                 root.settings = s
@@ -499,6 +568,12 @@ BarWidget {
               placeholderText: "Model (e.g. google/gemma-4-e4b)"
               foreground: Color.foreground
               font.family: Style.font.family
+              Keys.onPressed: function(event) {
+                if (event.key === Qt.Key_Escape) {
+                  root.close()
+                  event.accepted = true
+                }
+              }
               onTextChanged: {
                 var p = root.settings.provider
                 var s = Object.assign({}, root.settings)
@@ -599,7 +674,18 @@ BarWidget {
               font.family: Style.font.family
               font.pixelSize: Style.font.body
               wrapMode: Text.Wrap
-              onTextChanged: root.inputText = text
+              onTextChanged: {
+                if (!root.syncingInputText && root.inputText !== text) {
+                  root.inputText = text
+                }
+              }
+
+              Keys.onPressed: function(event) {
+                if (event.key === Qt.Key_Escape) {
+                  root.close()
+                  event.accepted = true
+                }
+              }
 
               Keys.onReturnPressed: function(event) {
                 if (event.modifiers & Qt.ControlModifier) {
@@ -628,7 +714,10 @@ BarWidget {
               text: "Paste Clipboard"
               iconText: "󰅇"
               fontSize: Style.font.caption
-              onClicked: readClipboardProc.running = true
+              onClicked: {
+                if (readClipboardProc.running) readClipboardProc.running = false
+                readClipboardProc.running = true
+              }
             }
 
             Button {
@@ -637,9 +726,11 @@ BarWidget {
               tooltipText: "Clear text"
               fontSize: Style.font.caption
               onClicked: {
-                root.inputText = ""
+                root.syncInputText("")
                 root.outputText = ""
                 root.errorMessage = ""
+                copyProc.command = ["wl-copy", "-p", "-c"]
+                copyProc.running = true
               }
             }
           }
@@ -706,7 +797,7 @@ BarWidget {
                 iconText: "󰁔"
                 fontSize: Style.font.caption
                 onClicked: {
-                  root.inputText = root.outputText
+                  root.syncInputText(root.outputText)
                   root.outputText = ""
                 }
               }
