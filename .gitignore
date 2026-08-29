@@ -3,5 +3,10 @@
 *.swp
 *~
 *.bak
+*.bak.*
 .local/
 *.json.bak
+
+# Rust build artifacts
+target/
+**/target/

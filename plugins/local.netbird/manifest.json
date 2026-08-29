@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "local.netbird",
+  "name": "NetBird VPN",
+  "version": "1.0.0",
+  "author": "admhmdf",
+  "license": "MIT",
+  "description": "NetBird VPN connection manager with fast gateway switching (Fliptech & DTK Tech), live status monitoring, and 1-click IP copy.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "NetBird VPN",
+    "description": "Toggle NetBird VPN, switch management URLs, and manage peers",
+    "category": "Network",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}

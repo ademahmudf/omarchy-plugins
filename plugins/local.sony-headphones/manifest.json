@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "id": "local.sony-headphones",
+  "name": "Sony Headphones",
+  "version": "1.0.0",
+  "author": "admhmdf",
+  "license": "MIT",
+  "description": "Sound mode controller (ANC, Ambient Sound, Off), Equalizer presets, Speak-to-Chat, and battery monitor for Sony WH/WF headphones.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Sony Headphones",
+    "description": "Control ANC, Ambient Sound level, EQ presets, and Speak-to-Chat on Sony WH/WF headphones",
+    "category": "Media",
+    "allowMultiple": false,
+    "defaultSection": "right"
+  }
+}
